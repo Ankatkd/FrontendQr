@@ -12,7 +12,7 @@ import OrderConfirmation from "./components/OrderConfirmation";
 import PhoneLogin from "./components/PhoneLogin";
 import AuthChoicePage from "./components/AuthChoicePage";
 import Profile from './components/Profile';
-import CookDashboard from './components/CookDashboard';
+import CookDashboard from './components/cookDashboard';
 
 // Import Owner-specific components
 import MonthlySalesReport from './components/MonthlySalesReport';
