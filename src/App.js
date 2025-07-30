@@ -1,129 +1,160 @@
 // frontend/src/App.js
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-router-dom";
-import Navbar from "./components/Navbar";
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import Navbar from "./components/Navbar"; // Assuming Navbar will be updated to use AuthContext
 import Menu from "./components/Menu";
 import CombinedOrdersView from './components/CombinedOrdersView';
-import OrderStatus from "./components/OrderStatus";
-import Login from "./components/Login";
+import OrderStatus from "./components/OrderStatus"; // This might be redundant if CombinedOrdersView shows status
+import Login from "./components/Login"; // Password-based login
 import OrderSummary from "./components/OrderSummary";
 import Payment from "./components/Payment";
 import OrderConfirmation from "./components/OrderConfirmation";
-import PhoneLogin from "./components/PhoneLogin";
-import AuthChoicePage from "./components/AuthChoicePage";
+import PhoneLogin from "./components/PhoneLogin"; // OTP-based login
+import AuthChoicePage from "./components/AuthChoicePage"; // Page to choose login method
 import Profile from './components/Profile';
-import CookDashboard from './components/cookDashboard';
+import CookDashboard from './components/CookDashboard';
+import OwnerDashboard from './components/OwnerDashboard';
+import Bill from './components/Bill';
 
-// Import Owner-specific components
-import MonthlySalesReport from './components/MonthlySalesReport';
-import DailySalesReport from './components/DailySalesReport';
-import PopularItemsReport from './components/PopularItemsReport';
-import TransactionsReport from "./components/TransactionsReport";
-import UserFeedback from './components/Feedback';
+// Import AuthProvider and useAuth from your context
+import { AuthProvider, useAuth } from './context/AuthContext';
+
+// --- ProtectedRoute Component ---
+// This component ensures only authenticated users with specific roles can access certain routes.
+const ProtectedRoute = ({ children, allowedRoles }) => {
+  const { isAuthenticated, user, loading, logout } = useAuth(); // Get auth state from context
+
+  // Show a loading spinner while authentication status is being checked
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <p className="text-lg text-gray-700">Loading authentication...</p>
+      </div>
+    );
+  }
+
+  // If not authenticated, redirect to the login page
+  if (!isAuthenticated) {
+    // Also, if the token was invalid, logout cleans up localStorage
+    logout(); // Ensure any stale token is cleared
+    return <Navigate to="/login" replace />;
+  }
+
+  // If authenticated but no user object (shouldn't happen with proper backend), redirect
+  if (!user) {
+    logout();
+    return <Navigate to="/login" replace />;
+  }
+
+  // Check if the user's role is allowed for this route
+  // If allowedRoles is not provided, any authenticated user can access.
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    console.warn(`Access Denied: User with role "${user.role}" attempted to access a route restricted to roles: ${allowedRoles.join(', ')}`);
+    // Redirect to a default authenticated route based on their actual role
+    switch (user.role) {
+      case 'customer': return <Navigate to="/menu" replace />;
+      case 'chef': return <Navigate to="/cook-dashboard" replace />;
+      case 'owner': return <Navigate to="/owner-dashboard" replace />;
+      default: return <Navigate to="/" replace />; // Fallback to home/auth choice
+    }
+  }
+
+  // If authenticated and authorized, render the children components
+  return children;
+};
+
+// --- HomeRedirect Component ---
+// This component determines where to redirect the user after initial load or login,
+// based on their authentication status and role.
+const HomeRedirect = () => {
+  const { isAuthenticated, user, loading } = useAuth();
+
+  // Show loading state while authentication is being checked
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <p className="text-lg text-gray-700">Loading application...</p>
+      </div>
+    );
+  }
+
+  // If authenticated, redirect to the appropriate dashboard/page based on role
+  if (isAuthenticated) {
+    switch (user?.role) {
+      case 'customer':
+        return <Navigate to="/menu" replace />; // Customers go to menu
+      case 'chef':
+        return <Navigate to="/cook-dashboard" replace />;
+      case 'owner':
+        return <Navigate to="/owner-dashboard" replace />; // Owners go to their dashboard
+      default:
+        return <Navigate to="/menu" replace />; // Fallback for unknown role, or a generic authenticated home
+    }
+  }
+  // If not authenticated, redirect to the initial authentication choice page
+  return <Navigate to="/auth-choice" replace />; // Use a specific path for auth choice
+};
 
 
 function App() {
-  const [loggedIn, setLoggedIn] = useState(false);
-  const [userRole, setUserRole] = useState(null); // State to store user's role
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    const storedRole = localStorage.getItem('userRole');
-    if (token) {
-      setLoggedIn(true);
-      setUserRole(storedRole);
-    }
-  }, []);
-
-  const handleLoginSuccess = (role) => {
-    setLoggedIn(true);
-    setUserRole(role);
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('userRole');
-    localStorage.removeItem('phoneNumber');
-    setLoggedIn(false);
-    setUserRole(null);
-    window.location.href = '/'; // Full refresh to clear all state and go to AuthChoicePage
-  };
-
-  const AppRoutes = () => {
-    const navigate = useNavigate();
-
-    useEffect(() => {
-      // This useEffect primarily handles redirection if a logged-in user
-      // somehow lands on an unauthorized path or needs to be steered to their default dashboard.
-      if (loggedIn && userRole) {
-        if (userRole === 'chef') {
-          // If a chef is not on their dashboard, redirect them
-          if (!window.location.pathname.startsWith('/cook-dashboard')) {
-            navigate('/cook-dashboard', { replace: true });
-          }
-        } else if (userRole === 'owner') {
-           // ✅ FIX: Ensure owner always goes to daily-sales if not already on an owner report page
-           if (!window.location.pathname.startsWith('/owner/')) {
-             navigate('/owner/daily-sales', { replace: true }); // Default owner landing page
-           }
-        }
-        else if (userRole === 'customer') {
-          // If a customer is on restricted pages, redirect to Menu
-          if (window.location.pathname.startsWith('/cook-dashboard') || window.location.pathname.startsWith('/owner/')) {
-            navigate('/Menu', { replace: true });
-          }
-        }
-      } else if (!loggedIn && window.location.pathname !== '/' && window.location.pathname !== '/login' && window.location.pathname !== '/phone') {
-        // If not logged in and not on a public auth page, redirect to auth choice
-        navigate('/', { replace: true });
-      }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [loggedIn, userRole, navigate]);
-
-
-    return (
-      <Routes>
-        {/* Public Routes / Initial choice */}
-        <Route path="/" element={<AuthChoicePage />} />
-        <Route path="/phone" element={<PhoneLogin onLoginSuccess={handleLoginSuccess} />} />
-        <Route path="/login" element={<Login onLoginSuccess={handleLoginSuccess} />} />
-
-        {/* All application routes are defined here. */}
-        <Route path="/Menu" element={<Menu />} /> 
-        <Route path="/orders" element={<CombinedOrdersView />} /> 
-        <Route path="/status" element={<OrderStatus />} />
-        <Route path="/ordersummary" element={<OrderSummary />} />
-        <Route path="/payment" element={<Payment />} />
-        <Route path="/orderconfirmation" element={<OrderConfirmation />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/cook-dashboard" element={<CookDashboard />} /> 
-        
-        {/* Owner-specific Routes */}
-        <Route path="/owner/monthly-sales" element={<MonthlySalesReport />} />
-        <Route path="/owner/daily-sales" element={<DailySalesReport />} />
-        <Route path="/owner/popular-items" element={<PopularItemsReport />} />
-        <Route path="/owner/transactions" element={<TransactionsReport />} />
-        <Route path="/owner/feedback" element={<UserFeedback />} />
-
-        {/* Fallback route for any unmatched paths (e.g., 404 or unauthorized access attempt) */}
-        <Route path="*" element={
-          loggedIn ? (
-            userRole === 'customer' ? <Menu /> :
-            (userRole === 'chef' ? <CookDashboard /> :
-            (userRole === 'owner' ? <DailySalesReport /> : <AuthChoicePage />)) 
-          ) : <AuthChoicePage />
-        } />
-      </Routes>
-    );
-  };
+  // Removed useAuth() call directly in App component, as Navbar will use it internally
+  // and other components are wrapped by ProtectedRoute or are public.
 
   return (
     <Router>
-      {loggedIn && <Navbar loggedIn={loggedIn} onLogout={handleLogout} userRole={userRole} />} 
-      
-      <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-6">
-        <AppRoutes />
-      </div>
+      <AuthProvider> {/* Wrap the entire application with AuthProvider */}
+        {/* Navbar should now be rendered inside AuthProvider to access context */}
+        <Navbar /> 
+        
+        <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-6">
+          <Routes>
+            {/* Public Routes - accessible to all, regardless of login status */}
+            <Route path="/auth-choice" element={<AuthChoicePage />} /> {/* New explicit path for auth choice */}
+            <Route path="/phone" element={<PhoneLogin />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/menu" element={<Menu />} /> 
+            <Route path="/ordersummary" element={<OrderSummary />} />
+            <Route path="/payment" element={<Payment />} />
+            <Route path="/orderconfirmation" element={<OrderConfirmation />} />
+            <Route path="/bill" element={<Bill />} /> 
+            <Route path="/cart" element={<Menu />} /> 
+            {/* Note: OrderStatus, PaymentSuccess, PaymentFailure, FeedbackPage routes might need to be defined here if public,
+                       or within ProtectedRoute if they require authentication. */}
+
+            {/* Protected Routes - require authentication and specific roles */}
+            <Route 
+              path="/my-orders" 
+              element={
+                <ProtectedRoute allowedRoles={['customer']}>
+                  <CombinedOrdersView />
+                </ProtectedRoute>
+              } 
+            />
+            <Route path="/profile" element={<ProtectedRoute allowedRoles={['customer', 'chef', 'owner', 'manager']}><Profile /></ProtectedRoute>} />
+
+            <Route 
+              path="/cook-dashboard" 
+              element={
+                <ProtectedRoute allowedRoles={['chef']}>
+                  <CookDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/owner-dashboard" 
+              element={
+                <ProtectedRoute allowedRoles={['owner']}>
+                  <OwnerDashboard />
+                </ProtectedRoute>
+              } 
+            />
+
+            {/* Default/Catch-all route: Redirects based on authentication status and role */}
+            <Route path="*" element={<HomeRedirect />} />
+          </Routes>
+        </div>
+      </AuthProvider>
     </Router>
   );
 }

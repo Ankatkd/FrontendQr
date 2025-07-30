@@ -1,7 +1,10 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import "../styles/PhoneLogin.css";
+import { useAuth } from '../context/AuthContext'; // Import useAuth
+import "../styles/PhoneLogin.css"; // Assuming this CSS file is still needed
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
 
 const PhoneLogin = () => {
   const [phone, setPhone] = useState("");
@@ -13,6 +16,7 @@ const PhoneLogin = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth(); // Get the login function from AuthContext
 
   const sendOtp = async () => {
     setErrorMessage("");
@@ -24,7 +28,7 @@ const PhoneLogin = () => {
     }
 
     try {
-      const response = await axios.post("http://localhost:5000/api/auth/request-otp", {
+      const response = await axios.post(`${API_BASE_URL}/api/auth/request-otp`, {
         phoneNumber: phone,
       });
 
@@ -52,36 +56,46 @@ const PhoneLogin = () => {
     }
 
     try {
-      const response = await axios.post("http://localhost:5000/api/auth/verify-otp", {
+      const response = await axios.post(`${API_BASE_URL}/api/auth/verify-otp`, {
         phoneNumber: phone,
         otp: otp,
       });
 
       if (response.data.success) {
-        const checkUserResponse = await axios.post("http://localhost:5000/api/auth/check-user", {
-          phoneNumber: phone,
-        });
+        // OTP is verified. Now use the token and user data from the response.
+        // The backend's verify-otp endpoint now returns token and user data.
+        login(response.data.user, response.data.token); // Use AuthContext's login
 
-        if (checkUserResponse.data.exists && checkUserResponse.data.user) {
-          localStorage.setItem("phoneNumber", phone);
-          localStorage.setItem("userRole", checkUserResponse.data.user.role);
-
-          if (checkUserResponse.data.user.role === "chef") {
-            navigate("/cook-dashboard");
-          } else if (checkUserResponse.data.user.role === "owner") {
-            navigate("/owner/daily-sales");
-          } else {
-            navigate("/Menu");
-          }
-        } else {
-          setShowPasswordFields(true);
-          setErrorMessage("OTP verified. Please set/reset your password.");
+        // Explicitly navigate based on the user's role
+        const userRole = response.data.user.role;
+        setErrorMessage("OTP verified successfully! Redirecting..."); // Keep message for a moment
+        switch (userRole) {
+          case 'customer':
+            navigate('/Menu', { replace: true });
+            break;
+          case 'chef':
+            navigate('/cook-dashboard', { replace: true });
+            break;
+          case 'owner':
+            navigate('/owner-dashboard', { replace: true });
+            break;
+          default:
+            navigate('/', { replace: true });
         }
       } else {
+        // If OTP verification failed, check if it's because the user needs to set a password
+        // This logic might need refinement based on your backend's exact `verify-otp` response for existing users without passwords.
+        // For now, if OTP is invalid, it's just invalid.
         setErrorMessage(response.data.message || "Invalid OTP. Please try again.");
       }
     } catch (error) {
-      setErrorMessage(error.response?.data?.message || "An error occurred while verifying OTP.");
+      // If the backend indicates a user doesn't have a password and needs to set one
+      if (error.response?.status === 400 && error.response?.data?.message === "User needs to set password") { // Example custom message from backend
+        setShowPasswordFields(true);
+        setErrorMessage("OTP verified. Please set your password.");
+      } else {
+        setErrorMessage(error.response?.data?.message || "An error occurred while verifying OTP.");
+      }
     } finally {
       setLoading(false);
     }
@@ -104,23 +118,31 @@ const PhoneLogin = () => {
     }
 
     try {
-      const response = await axios.post("http://localhost:5000/api/auth/register-or-update", {
+      // This endpoint now handles both registration and password updates
+      const response = await axios.post(`${API_BASE_URL}/api/auth/register-or-update`, {
         phoneNumber: phone,
         password: password,
       });
 
       if (response.data.success) {
-        localStorage.setItem("phoneNumber", phone);
-        localStorage.setItem("userRole", response.data.user.role);
-        localStorage.setItem("token", response.data.token);
+        // Use AuthContext's login function
+        login(response.data.user, response.data.token);
 
-        setErrorMessage("Account created/updated successfully! Redirecting...");
-        if (response.data.user.role === "chef") {
-          navigate("/cook-dashboard");
-        } else if (response.data.user.role === "owner") {
-          navigate("/owner/daily-sales");
-        } else {
-          navigate("/Menu");
+        // Explicitly navigate based on the user's role
+        const userRole = response.data.user.role;
+        setErrorMessage("Account created/updated successfully! Redirecting..."); // Keep message for a moment
+        switch (userRole) {
+          case 'customer':
+            navigate('/Menu', { replace: true });
+            break;
+          case 'chef':
+            navigate('/cook-dashboard', { replace: true });
+            break;
+          case 'owner':
+            navigate('/owner-dashboard', { replace: true });
+            break;
+          default:
+            navigate('/', { replace: true });
         }
       } else {
         setErrorMessage(response.data.message || "Failed to save user details.");

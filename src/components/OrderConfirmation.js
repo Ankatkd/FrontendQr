@@ -82,7 +82,7 @@ const OrderConfirmation = () => {
         </motion.button>
 
         <motion.button
-          onClick={() => navigate(`/order-status/${orderId}`, { state: { orderId, tableNo } })} // Pass orderId and tableNo to status page
+          onClick={() => navigate(`/my-orders/${orderId}`, { state: { orderId, tableNo } })} // Pass orderId and tableNo to status page
           className="bg-green-600 text-white px-8 py-3 rounded-lg text-lg font-semibold transition-all hover:bg-green-700 shadow-md"
           whileHover={{ scale: 1.05, boxShadow: "0px 8px 15px rgba(0, 0, 0, 0.2)" }}
           whileTap={{ scale: 0.95 }}

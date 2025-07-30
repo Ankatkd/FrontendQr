@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext'; // Import useAuth
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
 
-const Login = ({ onLoginSuccess }) => {
+const Login = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth(); // Get the login function from AuthContext
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -23,23 +25,23 @@ const Login = ({ onLoginSuccess }) => {
       });
 
       if (response.data.success) {
-        if (response.data.token) {
-          localStorage.setItem('token', response.data.token);
-        }
-        if (response.data.user) {
-          localStorage.setItem('userRole', response.data.user.role);
-          localStorage.setItem('phoneNumber', response.data.user.phoneNumber);
-        }
+        // Use the login function from AuthContext to set global state and localStorage
+        login(response.data.user, response.data.token);
 
-        if (onLoginSuccess && response.data.user && response.data.user.role) {
-          onLoginSuccess(response.data.user.role);
-          if (response.data.user.role === 'chef' || response.data.user.role === 'owner') {
-            navigate('/cook-dashboard');
-          } else {
-            navigate('/Menu');
-          }
-        } else {
-          navigate('/Menu');
+        // Explicitly navigate based on the user's role
+        const userRole = response.data.user.role;
+        switch (userRole) {
+          case 'customer':
+            navigate('/Menu', { replace: true }); // Redirect customer to Menu
+            break;
+          case 'chef':
+            navigate('/cook-dashboard', { replace: true }); // Redirect chef to Cook Dashboard
+            break;
+          case 'owner':
+            navigate('/owner-dashboard', { replace: true }); // Redirect owner to Owner Dashboard
+            break;
+          default:
+            navigate('/', { replace: true }); // Fallback to home/auth choice
         }
       } else {
         setError(response.data.message || 'Login failed. Please try again.');
