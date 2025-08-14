@@ -32,7 +32,7 @@ const Login = () => {
         const userRole = response.data.user.role;
         switch (userRole) {
           case 'customer':
-            navigate('/Menu', { replace: true }); // Redirect customer to Menu
+            navigate('/menu', { replace: true }); // Redirect customer to Menu
             break;
           case 'chef':
             navigate('/cook-dashboard', { replace: true }); // Redirect chef to Cook Dashboard
