@@ -19,6 +19,7 @@
     "react-router-dom": "^7.4.0",
     "react-scripts": "^5.0.1",
     "react-toastify": "^11.0.5",
+    "server": "^1.0.42",
     "socket.io-client": "^4.8.1",
     "web-vitals": "^2.1.4"
   },
@@ -48,6 +49,6 @@
   },
   "devDependencies": {
     "customize-cra": "^1.0.0",
-    "react-app-rewired": "^2.2.1" 
+    "react-app-rewired": "^2.2.1"
   }
 }
